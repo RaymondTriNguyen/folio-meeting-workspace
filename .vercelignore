@@ -1,0 +1,6 @@
+__pycache__/
+.npm-cache/
+app.py
+requirements.txt
+test-results/
+*.log

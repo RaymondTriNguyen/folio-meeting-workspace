@@ -1,0 +1,6 @@
+streamlit>=1.36
+groq>=0.9
+opencv-python-headless>=4.9
+requests>=2.31
+python-docx>=1.1.2
+reportlab>=4.2.5

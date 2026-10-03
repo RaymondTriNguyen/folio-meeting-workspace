@@ -86,10 +86,10 @@ export function requireProcessing(recording = false) {
       503,
       "AI processing isn't connected yet. Add Groq and Inngest credentials in your deployment settings.",
     );
-  if (recording && !process.env.ASSEMBLYAI_API_KEY)
+  if (recording && !process.env.OPENAI_API_KEY)
     throw new ApiError(
       503,
-      "Recording transcription isn't connected yet. Add an AssemblyAI API key, or paste a transcript instead.",
+      "Video transcription isn't connected yet. Add an OpenAI API key, or paste a transcript instead.",
     );
 }
 export async function rateLimit(userId: string, bucket: string, limit: number) {

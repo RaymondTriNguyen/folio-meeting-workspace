@@ -22,8 +22,8 @@ The overview contains actual library metrics, recent meetings, outstanding tasks
 | Demo | Explicitly labeled sample workspace, browser-persisted edits, sample transcript and exports; no simulated AI responses presented as real processing |
 | Accounts | Supabase email/password sign-in and sign-up, sign-out, server-validated identity on private APIs |
 | Persistence | Supabase PostgreSQL with row-level security; media in a private bucket with short-lived signed URLs |
-| Ingestion | Transcript paste/import and direct-to-storage audio/video uploads up to 100 MB for this release; title, project, participants, context, output length, consent |
-| Processing | Durable Inngest steps, hosted AssemblyAI transcription with diarization, Groq extraction in chunks, deterministic quote verification, summary composition |
+| Ingestion | Transcript paste/import, public video-page links, direct media URLs, and direct-to-storage audio/video uploads up to 25 MB for this release; title, project, participants, context, output length, consent |
+| Processing | Durable Inngest steps, YouTube caption import or resolver-backed media resolution, hosted OpenAI transcription with diarization, Groq extraction in chunks, deterministic quote verification, summary composition |
 | Reliability | Persisted processing stage, stage-level retry, actionable failure state and explicit retry; survives closed browser |
 | Review | Summary, requirements/decisions/actions/risks/questions, evidence timestamps, confidence flags, edits, additions, deletions, task completion, speaker labels |
 | Q&A | Server-side transcript retrieval, answers restricted to source evidence, validated timestamp references |
@@ -37,7 +37,7 @@ The overview contains actual library metrics, recent meetings, outstanding tasks
 - Supabase Auth identifies users; PostgreSQL stores meetings and their structured artifacts. RLS restricts access to the owner. This release is a personal workspace, not shared team permissions.
 - Supabase Storage accepts browser uploads using a server-issued signed upload token. Recording bytes never pass through Vercel API requests.
 - Inngest receives authenticated meeting creation events. Each external request runs in a durable step; polling waits happen outside function execution. The browser polls the persisted record while processing.
-- AssemblyAI handles asynchronous transcription and speaker labels. Groq handles structured extraction and summaries. Provider credentials remain on the server.
+- OpenAI handles file transcription, speaker labels, and timestamped segments. Groq handles structured extraction and summaries. Provider credentials remain on the server.
 - A browser-local sample workspace is available without credentials. It never uploads personal material or calls paid services.
 
 ## Data contracts
@@ -48,7 +48,7 @@ Transcript segment: ID, start/end in seconds, speaker label, text. Plain transcr
 
 Extracted item: ID, kind, text, category, priority, owner, due date, source segment ID, evidence quote, confidence, explicit/inferred flag, review status, task completion. Source timing is resolved from the referenced segment, never trusted from an LLM.
 
-Job: meeting ID and authenticated owner ID. Status transitions: queued -> transcribing (recordings) -> extracting -> verifying -> writing -> ready; any stage may transition to failed. User-triggered retry starts a new event and retains available transcript data.
+Job: video analysis ID and authenticated owner ID. Status transitions: queued -> preparing source -> transcribing -> extracting -> verifying -> writing -> ready; any stage may transition to failed. User-triggered retry starts a new event and retains available transcript data.
 
 ## Trust and validation
 
@@ -58,7 +58,7 @@ Validate input and model output with Zod. Split long transcripts into bounded ch
 
 Vercel functions have a 4.5 MB request/response limit and finite execution duration. Use direct storage uploads and durable background steps. Do not run ffmpeg, Streamlit, filesystem databases, or long polling loops inside a request.
 
-This release caps recordings at 100 MB and two hours, transcripts at 180,000 characters. The original 2 GB upload target requires resumable uploads plus an appropriately configured storage plan and is a subsequent milestone. Hosted services and API credentials are required for live processing. No paid infrastructure is provisioned automatically.
+This release caps uploaded videos at 25 MB and two hours, transcripts at 180,000 characters. YouTube captions work directly; other video-page links require a resolver adapter that returns a short-lived media URL. The original larger-upload target requires chunking or resumable transcription plus an appropriately configured storage plan and is a subsequent milestone. Hosted services and API credentials are required for live processing. No paid infrastructure is provisioned automatically.
 
 ## Deferred features
 
@@ -83,4 +83,4 @@ Pass TypeScript, ESLint, production build, and meaningful tests covering evidenc
 - Next.js setup: https://nextjs.org/docs/app/getting-started/installation
 - Supabase storage: https://supabase.com/docs/guides/storage/uploads/standard-uploads
 - Inngest durable steps: https://www.inngest.com/docs/learn/inngest-steps
-- AssemblyAI diarization: https://www.assemblyai.com/docs/pre-recorded-audio/speaker-diarization
+- OpenAI speech-to-text: https://developers.openai.com/api/docs/guides/speech-to-text

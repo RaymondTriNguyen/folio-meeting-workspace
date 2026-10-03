@@ -13,6 +13,13 @@ import {
 } from "../src/lib/domain";
 import { demoMeetings } from "../src/lib/demo";
 import { meetingMarkdown } from "../src/lib/export";
+import {
+  parseYouTubeCaptionJson,
+  parseYouTubeCaptionXml,
+  parseYouTubeVideoId,
+} from "../src/lib/youtube";
+import { detectVideoProvider } from "../src/lib/video-source";
+import { normalizeOpenAITranscription } from "../src/lib/ai";
 
 test("parses timestamped speaker turns without losing quoted text", () => {
   const segments = parseTranscript(
@@ -26,6 +33,14 @@ test("parses timestamped speaker turns without losing quoted text", () => {
     text: "We need SSO.",
   });
   assert.equal(segments[1].start, 3729);
+});
+test("joins YouTube timestamp lines with the following caption text", () => {
+  const segments = parseTranscript("0:00\nHello everyone.\n0:03\nWelcome back.");
+  assert.equal(segments.length, 2);
+  assert.equal(segments[0].start, 0);
+  assert.equal(segments[0].text, "Hello everyone.");
+  assert.equal(segments[1].start, 3);
+  assert.equal(segments[1].text, "Welcome back.");
 });
 test("never invents timing for a plain transcript", () => {
   const segments = parseTranscript(
@@ -72,6 +87,106 @@ test("requires consent and exactly one input source", () => {
     }).success,
     true,
   );
+  assert.equal(
+    createMeetingSchema.safeParse({
+      ...base,
+      transcript: undefined,
+      videoUrl: "https://youtu.be/abcdefghijk",
+    }).success,
+    true,
+  );
+  assert.equal(
+    createMeetingSchema.safeParse({
+      ...base,
+      transcript: undefined,
+      sourcePath: "user/file.mp4",
+      videoUrl: "https://youtu.be/abcdefghijk",
+    }).success,
+    false,
+  );
+});
+test("accepts supported YouTube URL formats and rejects lookalike hosts", () => {
+  assert.equal(
+    parseYouTubeVideoId("https://www.youtube.com/watch?v=abcdefghijk"),
+    "abcdefghijk",
+  );
+  assert.equal(
+    parseYouTubeVideoId("https://www.youtube.com/shorts/abcdefghijk"),
+    "abcdefghijk",
+  );
+  assert.equal(parseYouTubeVideoId("https://example.com/watch?v=abcdefghijk"), null);
+  assert.equal(parseYouTubeVideoId("https://youtube.com/watch?v=too-short"), null);
+});
+test("identifies common video link providers", () => {
+  assert.equal(detectVideoProvider("https://www.tiktok.com/@folio/video/1"), "tiktok");
+  assert.equal(detectVideoProvider("https://www.instagram.com/reel/abc/"), "instagram");
+  assert.equal(detectVideoProvider("https://vimeo.com/123456"), "vimeo");
+  assert.equal(detectVideoProvider("https://x.com/example/status/123"), "x");
+  assert.equal(detectVideoProvider("https://cdn.example.com/video.mp4"), "direct");
+});
+test("converts YouTube caption XML into timestamped transcript segments", () => {
+  const segments = parseYouTubeCaptionXml(
+    '<transcript><text start="1.5" dur="2.25">Hello &amp; welcome</text><text start="4">Let&#39;s go</text></transcript>',
+  );
+  assert.deepEqual(segments, [
+    {
+      id: "yt-1",
+      start: 1.5,
+      end: 3.75,
+      speaker: "Speaker",
+      text: "Hello & welcome",
+    },
+    {
+      id: "yt-2",
+      start: 4,
+      end: null,
+      speaker: "Speaker",
+      text: "Let's go",
+    },
+  ]);
+});
+test("converts YouTube JSON3 captions into timestamped transcript segments", () => {
+  const segments = parseYouTubeCaptionJson(
+    JSON.stringify({
+      events: [
+        { tStartMs: 1500, dDurationMs: 2250, segs: [{ utf8: "Hello " }, { utf8: "world" }] },
+        { tStartMs: 4000, dDurationMs: 1000, segs: [{ utf8: "Let's go" }] },
+      ],
+    }),
+  );
+  assert.deepEqual(segments, [
+    {
+      id: "yt-1",
+      start: 1.5,
+      end: 3.75,
+      speaker: "Speaker",
+      text: "Hello world",
+    },
+    {
+      id: "yt-2",
+      start: 4,
+      end: 5,
+      speaker: "Speaker",
+      text: "Let's go",
+    },
+  ]);
+});
+test("normalizes OpenAI diarized transcription segments", () => {
+  const result = normalizeOpenAITranscription({
+    duration: 8.5,
+    segments: [
+      { start: 0, end: 4.5, speaker: "A", text: "We should ship Friday." },
+      { start: 4.5, end: 8.5, speaker: "B", text: "Agreed." },
+    ],
+  });
+  assert.deepEqual(result.segments[0], {
+    id: "seg-1",
+    start: 0,
+    end: 4.5,
+    speaker: "Speaker A",
+    text: "We should ship Friday.",
+  });
+  assert.equal(result.duration, 8.5);
 });
 test("bounds oversized ASR turns while preserving citation IDs", () => {
   const chunks = chunkTranscript([{ id: "asr-1", start: 0, end: 300, speaker: "A", text: "x".repeat(40000) }]);

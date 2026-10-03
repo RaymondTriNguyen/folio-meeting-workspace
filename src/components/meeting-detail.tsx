@@ -14,6 +14,7 @@ import {
   CircleAlert,
   Clock3,
   Download,
+  ExternalLink,
   FileText,
   Headphones,
   ListChecks,
@@ -226,14 +227,14 @@ export function MeetingDetail({
     <div className="meeting-detail page-enter">
       <button className="back-link" onClick={onBack}>
         <ArrowLeft size={15} />
-        Back to meetings
+        Back to video library
       </button>
       <div className="detail-heading">
         <div>
           <div className="eyebrow">
             <span className="mini-dot sage" />
             {meeting.project.toUpperCase()}
-            {demo && <span className="sample-label">SAMPLE MEETING</span>}
+            {demo && <span className="sample-label">SAMPLE VIDEO</span>}
           </div>
           <h1>{meeting.title}</h1>
           <div className="meeting-metadata">
@@ -301,7 +302,7 @@ export function MeetingDetail({
           </details>
           <button
             className="icon-button bordered danger-hover"
-            aria-label="Delete meeting"
+            aria-label="Delete video analysis"
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 size={17} />
@@ -350,7 +351,7 @@ export function MeetingDetail({
                   ["summary", "Overview", FileText],
                   ["items", "Key findings", ListChecks],
                   ["transcript", "Transcript", AudioLines],
-                  ["chat", "Ask this meeting", MessageSquare],
+                  ["chat", "Ask this video", MessageSquare],
                 ].map(([id, label, Icon]) => {
                   const TabIcon = Icon as typeof FileText;
                   return (
@@ -683,7 +684,7 @@ export function MeetingDetail({
                       <input
                         value={transcriptSearch}
                         onChange={(e) => setTranscriptSearch(e.target.value)}
-                        placeholder="Search the conversation..."
+                        placeholder="Search the video transcript..."
                         aria-label="Search transcript"
                       />
                     </label>
@@ -697,8 +698,8 @@ export function MeetingDetail({
                   </div>
                   <p className="transcript-note">
                     {demo
-                      ? "Selected passages from a fictional meeting. No recording is attached."
-                      : "Click a timestamp to play the recording from that moment. Untimed transcripts remain untimed."}
+                      ? "Selected passages from a fictional video. No recording is attached."
+                      : "Click a timestamp to play the source from that moment. Untimed transcripts remain untimed."}
                   </p>
                   {segments.map((segment, i) => (
                     <div
@@ -737,10 +738,10 @@ export function MeetingDetail({
                     <span className="summary-symbol">
                       <Sparkles size={23} />
                     </span>
-                    <h2>Your meeting has the answers.</h2>
+                    <h2>Your video has the answers.</h2>
                     <p>
                       {demo
-                        ? "Explore source passages in this sample meeting."
+                        ? "Explore source passages in this sample video."
                         : "Ask a question. Get an answer with the evidence behind it."}
                     </p>
                   </div>
@@ -792,7 +793,7 @@ export function MeetingDetail({
                     {asking && (
                       <div className="chat-thinking">
                         <LoaderCircle className="spin" size={16} />
-                        Looking through the conversation...
+                        Looking through the video transcript...
                       </div>
                     )}
                     <div ref={messageEnd} />
@@ -807,8 +808,8 @@ export function MeetingDetail({
                     <input
                       value={question}
                       onChange={(e) => setQuestion(e.target.value)}
-                      placeholder="Ask about this meeting..."
-                      aria-label="Question about this meeting"
+                      placeholder="Ask about this video..."
+                      aria-label="Question about this video"
                       maxLength={2000}
                       minLength={3}
                       required
@@ -844,7 +845,7 @@ export function MeetingDetail({
                     preload="metadata"
                     onError={() =>
                       toast(
-                        "The recording link may have expired. Reopen this meeting to refresh it.",
+                        "The source link may have expired. Reopen this video to refresh it.",
                       )
                     }
                   />
@@ -864,6 +865,8 @@ export function MeetingDetail({
                     <span>
                       {meeting.sourcePath
                         ? "Loading recording..."
+                        : meeting.sourceUrl
+                          ? `Transcript imported from ${meeting.sourceProvider === "youtube" ? "YouTube" : "the video link"}.`
                         : "Every word, in perspective."}
                     </span>
                   </div>
@@ -873,8 +876,21 @@ export function MeetingDetail({
                   <p>
                     {meeting.sourcePath
                       ? "Private recording · Links expire after one hour"
-                      : "No recording attached. Explore the source transcript below."}
+                      : meeting.sourceUrl
+                        ? `${meeting.sourceProvider === "youtube" ? "Captions" : "Transcript"} imported from the video link · Original video remains at its source`
+                      : "No source file attached. Explore the transcript below."}
                   </p>
+                  {meeting.sourceUrl && (
+                    <a
+                      className="text-button"
+                      href={meeting.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open original video
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
                   <button
                     className="text-button"
                     onClick={() => {
@@ -889,7 +905,7 @@ export function MeetingDetail({
               </section>
               <section className="panel people-panel">
                 <div className="section-heading">
-                  <h3>In the conversation</h3>
+                  <h3>In the source video</h3>
                   <button
                     className="icon-button"
                     aria-label="Edit speaker names"
@@ -949,19 +965,19 @@ export function MeetingDetail({
       )}
       {confirmDelete && (
         <Modal
-          title="Delete this meeting?"
+          title="Delete this video analysis?"
           onClose={() => setConfirmDelete(false)}
         >
           <p className="modal-intro">
             This removes &ldquo;{meeting.title}&rdquo;, its notes, and any
-            attached recording from your workspace.
+            attached source from your workspace.
           </p>
           <div className="modal-footer">
             <button
               className="button secondary"
               onClick={() => setConfirmDelete(false)}
             >
-              Keep meeting
+              Keep video
             </button>
             <button
               className="button danger"
@@ -978,7 +994,7 @@ export function MeetingDetail({
                 }
               }}
             >
-              Delete meeting
+              Delete video analysis
             </button>
           </div>
         </Modal>
@@ -997,18 +1013,18 @@ function Processing({
   const [retrying, setRetrying] = useState(false);
   const stages = [
     "queued",
-    ...(meeting.sourcePath ? ["transcribing"] : []),
+    ...(meeting.sourcePath || meeting.sourceUrl ? ["transcribing"] : []),
     "extracting",
     "verifying",
     "writing",
     "ready",
   ];
   const names: Record<string, string> = {
-    queued: "Meeting received",
+      queued: "Video received",
     transcribing: "Transcribe & identify speakers",
     extracting: "Find the important points",
     verifying: "Verify against the source",
-    writing: "Write your meeting notes",
+      writing: "Write your video notes",
     ready: "Ready for your review",
   };
   const current = stages.indexOf(meeting.status);
@@ -1031,7 +1047,7 @@ function Processing({
       </h2>
       <p>
         {meeting.error ||
-          "Your meeting is being processed in the background. Feel free to keep exploring."}
+          "Your video is being processed in the background. Feel free to keep exploring."}
       </p>
       <div className="pipeline-stages">
         {stages.map((s, i) => (

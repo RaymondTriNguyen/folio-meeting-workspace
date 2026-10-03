@@ -39,6 +39,14 @@ export const topicSchema = z.object({
 export type Item = z.infer<typeof itemSchema>;
 export type Segment = z.infer<typeof segmentSchema>;
 export type Topic = z.infer<typeof topicSchema>;
+export type VideoProvider =
+  | "youtube"
+  | "tiktok"
+  | "instagram"
+  | "vimeo"
+  | "x"
+  | "direct"
+  | "other";
 export type MeetingStatus =
   | "queued"
   | "transcribing"
@@ -57,6 +65,8 @@ export interface Meeting {
   duration: number;
   sourceName: string | null;
   sourcePath: string | null;
+  sourceUrl: string | null;
+  sourceProvider: VideoProvider | null;
   length: "brief" | "standard" | "detailed";
   status: MeetingStatus;
   stage: string;
@@ -82,19 +92,30 @@ export const createMeetingSchema = z
     transcript: z.string().max(180000).optional(),
     sourcePath: z.string().max(500).optional(),
     sourceName: z.string().max(250).optional(),
+    videoUrl: z
+      .string()
+      .trim()
+      .url("Paste a valid video link.")
+      .max(500)
+      .optional(),
   })
   .refine(
-    (v) =>
-      Boolean(
+    (v) => {
+      const transcript = Boolean(
         v.transcript?.trim().length && v.transcript.trim().length >= 40,
-      ) !== Boolean(v.sourcePath),
+      );
+      return [transcript, Boolean(v.sourcePath), Boolean(v.videoUrl)].filter(
+        Boolean,
+      ).length === 1;
+    },
     {
       message:
-        "Provide either a recording or a transcript of at least 40 characters.",
+        "Provide either a recording, a video link, or a transcript of at least 40 characters.",
     },
   );
 export type MeetingInput = z.infer<typeof createMeetingSchema>;
-export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+// OpenAI's file transcription endpoint accepts media files up to 25 MB.
+export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 export const MAX_MEETING_BYTES = 3 * 1024 * 1024;
 export function serializedBytes(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).length;
@@ -146,30 +167,51 @@ export function parseTranscript(raw: string): Segment[] {
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean);
-  const segments = lines
-    .flatMap((line) => {
-      const chunks: string[] = [];
-      for (let pos = 0; pos < line.length; pos += 4000)
-        chunks.push(line.slice(pos, pos + 4000));
-      return chunks;
-    })
-    .map((line, i) => {
-      const match = line.match(
-        /^\[?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\.\d+)?\]?\s*[-:]?\s*/,
-      );
-      const start = match
-        ? Number(match[1] || 0) * 3600 +
+  const entries: { start: number | null; text: string }[] = [];
+  let current: { start: number | null; text: string; timestamped: boolean } | null = null;
+  const flush = () => {
+    if (current?.text.trim())
+      entries.push({ start: current.start, text: current.text.trim() });
+    current = null;
+  };
+  for (const line of lines) {
+    const match = line.match(
+      /^\[?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\.\d+)?\]?\s*[-:]?\s*/,
+    );
+    if (match) {
+      flush();
+      current = {
+        start:
+          Number(match[1] || 0) * 3600 +
           Number(match[2]) * 60 +
-          Number(match[3])
-        : null;
-      const rest = match ? line.slice(match[0].length) : line;
-      const speaker = rest.match(/^([\p{L}\p{N} ._-]{1,60}):\s+/u);
+          Number(match[3]),
+        text: line.slice(match[0].length),
+        timestamped: true,
+      };
+    } else if (current?.timestamped) {
+      current.text = `${current.text} ${line}`.trim();
+    } else {
+      flush();
+      current = { start: null, text: line, timestamped: false };
+    }
+  }
+  flush();
+
+  const segments = entries
+    .flatMap(({ start, text }) => {
+      const chunks: string[] = [];
+      for (let pos = 0; pos < text.length; pos += 4000)
+        chunks.push(text.slice(pos, pos + 4000));
+      return chunks.map((chunk) => ({ start, text: chunk }));
+    })
+    .map(({ start, text }, i) => {
+      const speaker = text.match(/^([\p{L}\p{N} ._-]{1,60}):\s+/u);
       return {
         id: `seg-${i + 1}`,
         start,
         end: null as number | null,
         speaker: speaker ? speaker[1].trim() : "Speaker",
-        text: speaker ? rest.slice(speaker[0].length) : rest,
+        text: speaker ? text.slice(speaker[0].length) : text,
       };
     });
   return segments.map((s, i) => ({

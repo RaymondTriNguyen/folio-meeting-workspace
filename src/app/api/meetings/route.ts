@@ -15,6 +15,7 @@ import {
   type Meeting,
 } from "@/lib/domain";
 import { inngest } from "@/lib/jobs";
+import { detectVideoProvider } from "@/lib/video-source";
 
 export async function GET(request: Request) {
   try {
@@ -47,7 +48,15 @@ export async function POST(request: Request) {
   try {
     const { db, user } = await authenticated(request);
     const input = createMeetingSchema.parse(await jsonBody(request));
-    requireProcessing(Boolean(input.sourcePath));
+    const videoProvider = input.videoUrl
+      ? detectVideoProvider(input.videoUrl)
+      : null;
+    requireProcessing(
+      Boolean(
+        input.sourcePath ||
+          (input.videoUrl && videoProvider !== "youtube"),
+      ),
+    );
     await rateLimit(user.id, "create", 15);
     if (input.sourcePath) {
       if (
@@ -80,8 +89,10 @@ export async function POST(request: Request) {
       context: input.context,
       createdAt: new Date().toISOString(),
       duration: Math.max(0, ...transcript.map((s) => s.end || 0)),
-      sourceName: input.sourceName || null,
+      sourceName: input.sourceName || (input.videoUrl ? "Video link" : null),
       sourcePath: input.sourcePath || null,
+      sourceUrl: input.videoUrl || null,
+      sourceProvider: videoProvider,
       length: input.length,
       status: "queued",
       stage: "Waiting to process",

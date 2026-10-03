@@ -23,6 +23,8 @@ type Config = {
   ai: boolean;
   transcription: boolean;
   jobs: boolean;
+  videoLinks: boolean;
+  localTest: boolean;
 };
 type Workspace = {
   meetings: Meeting[];
@@ -33,6 +35,7 @@ type Workspace = {
   toast: (text: string) => void;
   api: <T>(path: string, init?: RequestInit) => Promise<T>;
   refresh: () => Promise<void>;
+  add: (meeting: Meeting) => void;
   update: (id: string, patch: Patch) => Promise<void>;
   remove: (id: string) => Promise<void>;
   reset: () => void;
@@ -66,6 +69,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     ai: false,
     transcription: false,
     jobs: false,
+    videoLinks: false,
+    localTest: false,
   });
   const demo = !session;
 
@@ -93,6 +98,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (!session) return;
     const current = (await browserDatabase()!.auth.getSession()).data.session;
     if (current) setMeetings(await fetchLibrary(current.access_token));
+  }
+  function add(meeting: Meeting) {
+    setMeetings((previous) => [meeting, ...previous]);
   }
   useEffect(() => {
     let mounted = true;
@@ -254,6 +262,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         config,
         api,
         refresh,
+        add,
         update,
         remove,
         reset: () => {

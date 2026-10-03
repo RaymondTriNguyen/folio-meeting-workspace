@@ -10,9 +10,9 @@ import "@fontsource/manrope/800.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Folio | Make every meeting matter",
+  title: "Folio | Make every video matter",
   description:
-    "Your conversations, made clear. Turn meetings into evidence-backed summaries, decisions, and next steps.",
+    "Your videos, made clear. Turn online videos and uploads into evidence-backed summaries, documents, and next steps.",
   icons: { icon: "/favicon.svg" },
 };
 export default function RootLayout({

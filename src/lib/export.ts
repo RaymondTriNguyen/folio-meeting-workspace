@@ -10,6 +10,7 @@ export function meetingMarkdown(
     `Project: ${meeting.project}`,
     `Date: ${meeting.createdAt.slice(0, 10)}`,
     `Participants: ${meeting.participants.join(", ") || "Not specified"}`,
+    `Source: ${meeting.sourceUrl || meeting.sourceName || "Transcript"}`,
     "",
     "## Executive summary",
     "",

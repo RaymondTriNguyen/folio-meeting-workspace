@@ -187,6 +187,8 @@ export function demoMeetings(): Meeting[] {
       duration: s.duration,
       sourceName: null,
       sourcePath: null,
+      sourceUrl: null,
+      sourceProvider: null,
       length: "standard",
       status: "ready",
       stage: "Ready to review",

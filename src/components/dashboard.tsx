@@ -25,6 +25,7 @@ import {
   Headphones,
   LayoutDashboard,
   ListFilter,
+  Link2,
   LoaderCircle,
   LogOut,
   Menu,
@@ -46,7 +47,7 @@ import { MeetingDetail } from "./meeting-detail";
 
 const nav = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "meetings", label: "All meetings", icon: Video },
+  { id: "meetings", label: "Video library", icon: Video },
   { id: "actions", label: "Action items", icon: CheckSquare2 },
   { id: "projects", label: "Projects", icon: FolderClosed },
 ];
@@ -217,7 +218,7 @@ export function Dashboard() {
           ))}
           {!projects.length && (
             <span className="sidebar-muted">
-              Projects appear with your meetings.
+              Projects appear with your video summaries.
             </span>
           )}
         </div>
@@ -227,16 +228,16 @@ export function Dashboard() {
               <Sparkles size={18} />
             </span>
             <strong>
-              A little less meeting.
+              A little less replay.
               <br />A lot more meaning.
             </strong>
             <p>
-              Make your next conversation
+              Make your next video
               <br />
               your next step forward.
             </p>
             <button onClick={() => setDialog("upload")}>
-              Add a meeting
+              Add a video
               <ArrowUpRight size={15} />
             </button>
           </div>
@@ -290,7 +291,7 @@ export function Dashboard() {
             </button>
             <span className="breadcrumb-muted">Workspace</span>
             <ChevronRight size={13} />
-            <span>{active ? "Meeting notes" : current}</span>
+            <span>{active ? "Video summary" : current}</span>
           </div>
           <div className="topbar-tools">
             <button
@@ -338,11 +339,11 @@ export function Dashboard() {
                 <FileText size={32} />
                 <h2>
                   {loading
-                    ? "Opening your meeting..."
-                    : "This meeting isn't here."}
+                    ? "Opening your video summary..."
+                    : "This video isn't here."}
                 </h2>
                 <Link className="button secondary" href="/?view=meetings">
-                  Back to meetings
+                  Back to video library
                 </Link>
               </div>
             )
@@ -372,7 +373,7 @@ export function Dashboard() {
             <span className="live-dot" />
             {demo
               ? "Sample workspace · Saved in this browser"
-              : "Your private meeting workspace"}
+              : "Your private video workspace"}
           </span>
           <span>Made for the moments that matter.</span>
         </footer>
@@ -398,7 +399,7 @@ export function Dashboard() {
               autoFocus
               value={globalQuery}
               onChange={(e) => setGlobalQuery(e.target.value)}
-              placeholder="A meeting, decision, project, or phrase..."
+              placeholder="A video, decision, project, or phrase..."
             />
           </label>
           <div className="search-results">
@@ -436,7 +437,7 @@ export function Dashboard() {
           onClose={() => setDialog(null)}
         >
           <p className="modal-intro">
-            Uncertain points and interrupted meetings, all in one place.
+            Uncertain points and interrupted videos, all in one place.
           </p>
           <div className="search-results">
             {reviewMeetings.map((m) => (
@@ -549,7 +550,7 @@ function Overview({
   ).length;
   const metrics = [
     {
-      label: "Meetings in focus",
+      label: "Videos in focus",
       value: filtered.length,
       icon: Video,
       color: "sage",
@@ -557,7 +558,7 @@ function Overview({
       points: filtered.map((_, i) => i + 1),
     },
     {
-      label: "Hours of conversation",
+      label: "Hours of video",
       value: hours,
       suffix: "hrs",
       icon: Clock3,
@@ -605,7 +606,7 @@ function Overview({
         </div>
         <button className="button primary" onClick={onUpload}>
           <Plus size={18} />
-          New meeting
+          New video analysis
         </button>
       </div>
       <section className="welcome-banner">
@@ -620,14 +621,14 @@ function Overview({
             Even better follow-through.
           </h2>
           <p>
-            Your meetings hold good ideas. Give them somewhere to go.
+            Videos hold good ideas. Give them somewhere to go.
             <br className="desktop-break" /> Capture the essentials and make
             your next move.
           </p>
           <div className="hero-buttons">
             <button className="button dark" onClick={onUpload}>
               <Upload size={16} />
-              Upload a meeting
+              Upload a video
               <ArrowUpRight size={16} />
             </button>
             <button className="button ghost" onClick={onGuide}>
@@ -685,7 +686,7 @@ function Overview({
         <section className="panel recent-panel">
           <div className="section-heading">
             <div className="heading-with-count">
-              <h2>Recent meetings</h2>
+              <h2>Recent videos</h2>
               <span className="count-pill">{filtered.length}</span>
             </div>
             <Link className="text-button" href="/?view=meetings">
@@ -739,8 +740,8 @@ function Overview({
         </span>
         <p>
           {demo
-            ? "A workspace with a little possibility. These sample meetings are yours to explore."
-            : "The best meeting notes are the ones that move your work forward."}
+            ? "A workspace with a little possibility. These sample videos are yours to explore."
+            : "The best video summaries are the ones that move your work forward."}
         </p>
         {demo && (
           <span>
@@ -852,11 +853,11 @@ function MeetingTable({
       <table className={`meeting-table ${compact ? "compact" : ""}`}>
         <thead>
           <tr>
-            <th>MEETING</th>
+            <th>VIDEO</th>
             <th>DATE & TIME</th>
             {!compact && <th>PARTICIPANTS</th>}
             <th>STATUS</th>
-            <th aria-label="Open meeting" />
+            <th aria-label="Open video" />
           </tr>
         </thead>
         <tbody>
@@ -865,7 +866,9 @@ function MeetingTable({
               <td>
                 <div className="meeting-name-cell">
                   <span className={`meeting-icon ${projectTone(m.project)}`}>
-                    {m.sourceName ? (
+                    {m.sourceUrl ? (
+                      <Link2 size={18} />
+                    ) : m.sourceName ? (
                       <FileAudio2 size={18} />
                     ) : (
                       <Video size={18} />
@@ -934,11 +937,11 @@ function EmptyMeetings({ onUpload }: { onUpload: () => void }) {
       <Headphones size={32} />
       <h3>Your next great idea starts here.</h3>
       <p>
-        Add your first meeting to bring its decisions and next steps into focus.
+        Add your first video to bring its summary and next steps into focus.
       </p>
       <button className="button primary" onClick={onUpload}>
         <Plus size={16} />
-        New meeting
+        New video analysis
       </button>
     </div>
   );
@@ -983,25 +986,25 @@ function MeetingsPage({
     <div className="page-enter">
       <div className="page-heading">
         <div>
-          <div className="eyebrow">YOUR CONVERSATION LIBRARY</div>
+          <div className="eyebrow">YOUR VIDEO LIBRARY</div>
           <h1>
             Good ideas live here<span className="orange-period">.</span>
           </h1>
-          <p>Every conversation, decision, and next step. All within reach.</p>
+          <p>Every video, summary, and next step. All within reach.</p>
         </div>
         <button className="button primary" onClick={onUpload}>
           <Plus size={18} />
-          New meeting
+          New video analysis
         </button>
       </div>
       <div className="library-toolbar">
         <label className="search-box">
           <Search size={17} />
           <input
-            aria-label="Search meetings"
+            aria-label="Search videos"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find a meeting..."
+            placeholder="Find a video..."
           />
           {query && (
             <button aria-label="Clear search" onClick={() => setQuery("")}>
@@ -1043,7 +1046,7 @@ function MeetingsPage({
         <label className="select-control">
           <ArrowDown size={15} />
           <select
-            aria-label="Sort meetings"
+            aria-label="Sort videos"
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
@@ -1056,7 +1059,7 @@ function MeetingsPage({
       <section className="panel library-panel">
         <div className="section-heading">
           <div className="heading-with-count">
-            <h2>{project === "all" ? "All meetings" : project}</h2>
+            <h2>{project === "all" ? "All videos" : project}</h2>
             <span className="count-pill">{filtered.length}</span>
           </div>
           <span className="muted small-text">
@@ -1068,7 +1071,7 @@ function MeetingsPage({
           (meetings.length ? (
             <div className="empty-state">
               <Search size={30} />
-              <h3>No meetings match just yet.</h3>
+              <h3>No videos match just yet.</h3>
               <p>Try a different search or clear your filters.</p>
               <button
                 className="button secondary"
@@ -1313,7 +1316,7 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
     {
       label: "Workspace & secure storage",
       connected: config.database,
-      text: "Your account, meeting library, and private recordings.",
+      text: "Your account, video library, and private uploads.",
     },
     {
       label: "Meeting intelligence",
@@ -1324,6 +1327,11 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
       label: "Recording transcription",
       connected: config.transcription,
       text: "Speech-to-text with timing and speaker labels.",
+    },
+    {
+      label: "Multi-platform video links",
+      connected: config.videoLinks || config.transcription,
+      text: "YouTube captions or resolver-backed TikTok, Instagram, Vimeo, and X links.",
     },
     {
       label: "Background processing",
@@ -1364,7 +1372,7 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
             <p>
               {demo
                 ? "Sample data lives in this browser. Sign in to use a private, synced workspace."
-                : "Your meetings are private and connected to this account."}
+                : "Your video analyses are private and connected to this account."}
             </p>
           </div>
           <button
@@ -1418,9 +1426,9 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
           <div>
             <p>
               The project includes a complete setup guide in{" "}
-              <code>docs/DEPLOYMENT.md</code>. Connect Supabase, Groq,
-              AssemblyAI, and Inngest through your Vercel environment settings,
-              then redeploy.
+              <code>docs/DEPLOYMENT.md</code>. Connect Supabase, Groq, OpenAI,
+              and Inngest through your Vercel environment settings, then
+              redeploy.
             </p>
             <p>
               Provider keys stay on the server. The status above confirms
@@ -1451,8 +1459,8 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
             </strong>
             <p>
               {demo
-                ? "Restore the original fictional meetings and reset your demo edits."
-                : "Export individual meetings from their review page. Delete a meeting to remove its recording and notes from your workspace."}
+                ? "Restore the original fictional videos and reset your demo edits."
+                : "Export individual video summaries from their review page. Delete a video to remove its source metadata and notes from your workspace."}
             </p>
           </div>
           {demo && (
@@ -1468,7 +1476,7 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
       {confirmReset && (
         <Modal title="Start fresh?" onClose={() => setConfirmReset(false)}>
           <p className="modal-intro">
-            This restores the sample meetings and removes your demo edits in
+            This restores the sample videos and removes your demo edits in
             this browser.
           </p>
           <div className="modal-footer">

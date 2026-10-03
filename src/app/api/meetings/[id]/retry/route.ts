@@ -20,7 +20,13 @@ export async function POST(
     if (meeting.status !== "failed")
       throw new ApiError(409, "Only failed meetings can be retried.");
     requireProcessing(
-      Boolean(meeting.sourcePath && !meeting.transcript.length),
+      Boolean(
+        !meeting.transcript.length &&
+          (meeting.sourcePath ||
+            (meeting.sourceUrl &&
+              meeting.sourceProvider &&
+              meeting.sourceProvider !== "youtube")),
+      ),
     );
     await rateLimit(user.id, "create", 15);
     const updated = {

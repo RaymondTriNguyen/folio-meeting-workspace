@@ -7,6 +7,7 @@ import {
   CloudUpload,
   FileText,
   Headphones,
+  Link2,
   LoaderCircle,
   LockKeyhole,
   Mail,
@@ -84,14 +85,17 @@ export function UploadDialog({
   onCreated: (id: string) => void;
   onSignIn: () => void;
 }) {
-  const { demo, config, api, refresh, toast } = useWorkspace();
-  const [mode, setMode] = useState<"recording" | "transcript">("recording");
+  const { demo, config, api, add, refresh, toast } = useWorkspace();
+  const [mode, setMode] = useState<
+    "recording" | "transcript" | "video-link"
+  >("recording");
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [project, setProject] = useState("");
   const [participants, setParticipants] = useState("");
   const [context, setContext] = useState("");
   const [transcript, setTranscript] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [length, setLength] = useState<"brief" | "standard" | "detailed">(
     "standard",
   );
@@ -109,7 +113,7 @@ export function UploadDialog({
       );
     if (selected.size > MAX_UPLOAD_BYTES)
       return setError(
-        "This release supports recordings up to 100 MB. You can also paste a transcript.",
+        "OpenAI transcription supports recordings up to 25 MB. You can also paste a transcript.",
       );
     setError("");
     setFile(selected);
@@ -119,9 +123,9 @@ export function UploadDialog({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    if (demo) {
+    if (demo && !config.localTest) {
       setError(
-        "Sign in to a connected workspace to process your own meetings. Sample meetings are available to explore without an account.",
+        "Sign in to a connected workspace to process your own videos. Sample videos are available to explore without an account.",
       );
       return;
     }
@@ -148,10 +152,50 @@ export function UploadDialog({
       ...fields,
       ...(mode === "transcript"
         ? { transcript }
-        : { sourcePath: "pending-upload" }),
+        : mode === "video-link"
+          ? { videoUrl }
+          : { sourcePath: "pending-upload" }),
     });
     if (!validation.success) {
       setError(validation.error.issues[0].message);
+      return;
+    }
+    if (demo) {
+      try {
+        setBusy("Analyzing locally...");
+        const body = new FormData();
+        body.append("title", title);
+        body.append("project", project || "General");
+        body.append("participants", participants);
+        body.append("context", context);
+        body.append("length", length);
+        body.append("consent", "true");
+        if (mode === "recording" && file) body.append("file", file);
+        if (mode === "transcript") body.append("transcript", transcript);
+        if (mode === "video-link") body.append("videoUrl", videoUrl);
+        const response = await fetch("/api/test-video", {
+          method: "POST",
+          body,
+        });
+        const result = (await response.json()) as {
+          meeting?: Meeting;
+          error?: string;
+        };
+        if (!response.ok || !result.meeting)
+          throw new Error(result.error || "The local video test failed.");
+        add(result.meeting);
+        onCreated(result.meeting.id);
+        toast("Video analyzed locally. It is saved in this browser.");
+        return;
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "We couldn't analyze this video. Please try again.",
+        );
+      } finally {
+        setBusy("");
+      }
       return;
     }
     let sourcePath: string | undefined;
@@ -178,19 +222,21 @@ export function UploadDialog({
           );
         sourcePath = upload.path;
       }
-      setBusy("Starting your meeting analysis...");
+      setBusy("Starting your video analysis...");
       const result = await api<{ meeting: Meeting }>("/api/meetings", {
         method: "POST",
         body: JSON.stringify({
           ...fields,
           ...(mode === "transcript"
             ? { transcript }
-            : { sourcePath, sourceName: file?.name }),
+            : mode === "video-link"
+              ? { videoUrl }
+              : { sourcePath, sourceName: file?.name }),
         }),
       });
       await refresh();
       onCreated(result.meeting.id);
-      toast("Meeting added. You can leave this page while it processes.");
+      toast("Video added. You can leave this page while it processes.");
     } catch (err) {
       setError(
         err instanceof Error
@@ -204,13 +250,13 @@ export function UploadDialog({
   return (
     <Modal
       title="Make room for the important parts."
-      eyebrow="NEW MEETING"
+      eyebrow="NEW VIDEO ANALYSIS"
       onClose={() => {
         if (!busy) onClose();
       }}
       wide
     >
-      <p className="modal-intro">Bring a conversation. Leave with clarity.</p>
+      <p className="modal-intro">Bring a video. Leave with clarity.</p>
       <form onSubmit={submit}>
         <div className="segmented">
           <button
@@ -228,6 +274,14 @@ export function UploadDialog({
           >
             <FileText size={16} />
             Paste transcript
+          </button>
+          <button
+            type="button"
+            className={mode === "video-link" ? "selected" : ""}
+            onClick={() => setMode("video-link")}
+          >
+            <Link2 size={16} />
+            Video link
           </button>
         </div>
         {mode === "recording" ? (
@@ -260,7 +314,7 @@ export function UploadDialog({
             <p>
               {file
                 ? `${(file.size / 1024 / 1024).toFixed(1)} MB · Ready to upload`
-                : "Audio or video, up to 100 MB and 2 hours"}
+                : "Audio or video, up to 25 MB and 2 hours"}
             </p>
             <button
               className="button small secondary"
@@ -270,9 +324,9 @@ export function UploadDialog({
               {file ? "Choose a different file" : "Browse files"}
             </button>
           </div>
-        ) : (
+        ) : mode === "transcript" ? (
           <label className="field">
-            Meeting transcript
+            Video transcript
             <textarea
               rows={7}
               value={transcript}
@@ -289,10 +343,54 @@ export function UploadDialog({
               you provide.
             </span>
           </label>
+        ) : (
+          <div className="youtube-source">
+            <label className="field">
+              Video page or direct video link
+              <input
+                type="url"
+                inputMode="url"
+                value={videoUrl}
+                onChange={(e) => setVideoUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                required
+              />
+              <span className="field-note">
+                Paste a YouTube, TikTok, Instagram, Vimeo, X, or direct video
+                URL. Folio sends the resulting transcript through the same
+                evidence-backed analyzer.
+              </span>
+            </label>
+            <div className="inline-notice">
+              <Link2 size={18} />
+              <span>
+                Public links work when captions or a configured video-link
+                resolver are available. Private videos and blocked pages need a
+                pasted transcript or uploaded file instead.
+              </span>
+            </div>
+            <div className="inline-notice">
+              <FileText size={18} />
+              <span>
+                Have the transcript open in YouTube? Paste it directly and Folio
+                can summarize it without importing the video captions.
+              </span>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setMode("transcript");
+                  setError("");
+                }}
+              >
+                Paste transcript instead
+              </button>
+            </div>
+          </div>
         )}
         <div className="form-grid">
           <label className="field">
-            Meeting title
+            Video title
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -329,7 +427,7 @@ export function UploadDialog({
               rows={2}
               value={context}
               onChange={(e) => setContext(e.target.value)}
-              placeholder="What should we know about this meeting?"
+              placeholder="What should we know about this video?"
               maxLength={5000}
             />
           </label>
@@ -352,20 +450,21 @@ export function UploadDialog({
             onChange={(e) => setConsent(e.target.checked)}
           />
           <span>
-            I confirm that participants consented to this recording and its
-            processing.
+            I confirm that I have permission to process this video and its
+            content.
           </span>
         </label>
         {demo && (
           <div className="inline-notice">
             <LockKeyhole size={18} />
             <span>
-              You&apos;re exploring the demo.{" "}
-              {config.database
-                ? "Sign in to process your own meetings."
-                : "Connect the services in Settings to enable your live workspace."}
+              {config.localTest
+                ? "Local test mode is on. Your keys stay on this server and results are saved in this browser."
+                : config.database
+                  ? "Sign in to process your own videos."
+                  : "For local testing, add your provider keys and set FOLIO_LOCAL_TEST_MODE=1 in .env.local."}
             </span>
-            {config.database && (
+            {!config.localTest && config.database && (
               <button type="button" className="text-button" onClick={onSignIn}>
                 Sign in
               </button>
@@ -394,7 +493,7 @@ export function UploadDialog({
               </>
             ) : (
               <>
-                Create meeting
+                Create video summary
                 <Sparkles size={16} />
               </>
             )}
@@ -530,8 +629,8 @@ export function GuideDialog({ onClose }: { onClose: () => void }) {
         <div>
           <h3>1. Bring your conversation</h3>
           <p>
-            Upload a recording or paste a transcript. Add a project and the
-            context that matters.
+            Paste a video link, upload a file, or add a transcript. Add a
+            project and the context that matters.
           </p>
         </div>
       </div>
@@ -562,7 +661,7 @@ export function GuideDialog({ onClose }: { onClose: () => void }) {
       <div className="inline-notice">
         <Sparkles size={18} />
         <span>
-          Sample meetings are fictional and clearly labeled. Your demo edits
+          Sample videos are fictional and clearly labeled. Your demo edits
           stay in this browser.
         </span>
       </div>

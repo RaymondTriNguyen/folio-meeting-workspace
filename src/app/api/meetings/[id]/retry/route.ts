@@ -19,7 +19,8 @@ export async function POST(
     );
     if (meeting.status !== "failed")
       throw new ApiError(409, "Only failed meetings can be retried.");
-    requireProcessing(
+    await requireProcessing(
+      user.id,
       Boolean(
         !meeting.transcript.length &&
           (meeting.sourcePath ||

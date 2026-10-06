@@ -1968,6 +1968,94 @@ h3 {
   gap: 20px;
   padding-top: 20px;
 }
+.section-subtitle {
+  color: #91a080;
+  font-size: 11px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.provider-keys-locked {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 0 2px;
+  color: #81916f;
+}
+.provider-keys-locked > svg {
+  flex: 0 0 auto;
+  color: #8da477;
+}
+.provider-keys-locked > div {
+  flex: 1;
+}
+.provider-keys-locked strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.provider-keys-locked p {
+  color: #93a080;
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 5px;
+}
+.provider-key-list {
+  padding-top: 5px;
+}
+.provider-key-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid #eef1e7;
+}
+.provider-key-row:last-child {
+  border-bottom: 0;
+}
+.provider-key-copy {
+  flex: 1;
+  min-width: 180px;
+}
+.provider-key-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.provider-key-copy strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.provider-key-copy p {
+  color: #9daa8f;
+  font-size: 10px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.provider-key-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  flex: 1.2;
+}
+.provider-key-controls input {
+  min-width: 0;
+  width: min(300px, 100%);
+  padding: 10px 12px;
+  border: 1px solid #dfe6d7;
+  border-radius: 7px;
+  color: var(--ink);
+  background: #fbfcf8;
+  font: inherit;
+  font-size: 11px;
+  outline: none;
+}
+.provider-key-controls input:focus {
+  border-color: #99ae87;
+  box-shadow: 0 0 0 3px #a8bb9633;
+}
+.danger-text {
+  color: #b26d5b;
+}
 .modal {
   padding: 29px;
   border: 1px solid #dfe6d7;
@@ -4434,6 +4522,26 @@ h3 {
   }
   .settings-section > .section-heading h2 {
     font-size: 12px;
+  }
+  .provider-keys-locked {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .provider-keys-locked > .button {
+    margin-left: 34px;
+  }
+  .provider-key-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .provider-key-controls {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .provider-key-controls input {
+    width: 100%;
+    flex-basis: 100%;
   }
   .detail-heading h1 {
     font-size: 24px;

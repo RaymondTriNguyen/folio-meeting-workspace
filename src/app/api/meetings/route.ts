@@ -51,7 +51,8 @@ export async function POST(request: Request) {
     const videoProvider = input.videoUrl
       ? detectVideoProvider(input.videoUrl)
       : null;
-    requireProcessing(
+    await requireProcessing(
+      user.id,
       Boolean(
         input.sourcePath ||
           (input.videoUrl && videoProvider !== "youtube"),

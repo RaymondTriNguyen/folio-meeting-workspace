@@ -1,7 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto";
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import type { Meeting } from "./domain";
+
+export type ProviderKeys = {
+  groqApiKey?: string;
+  openaiApiKey?: string;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -33,6 +44,125 @@ export async function authenticated(request: Request) {
   if (error || !data.user)
     throw new ApiError(401, "Your session has expired. Please sign in again.");
   return { db, user: data.user };
+}
+
+function credentialKey() {
+  const secret = process.env.FOLIO_CREDENTIALS_ENCRYPTION_KEY;
+  if (!secret)
+    throw new ApiError(
+      503,
+      "Secure provider credentials are not connected yet. Add FOLIO_CREDENTIALS_ENCRYPTION_KEY in the deployment settings.",
+    );
+  return createHash("sha256").update(secret).digest();
+}
+
+function encryptSecret(value: string) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", credentialKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [iv, tag, encrypted]
+    .map((part) => part.toString("base64url"))
+    .join(".");
+}
+
+function decryptSecret(value: string) {
+  const [ivValue, tagValue, encryptedValue] = value.split(".");
+  if (!ivValue || !tagValue || !encryptedValue)
+    throw new ApiError(503, "A saved provider credential could not be read.");
+  try {
+    const decipher = createDecipheriv(
+      "aes-256-gcm",
+      credentialKey(),
+      Buffer.from(ivValue, "base64url"),
+    );
+    decipher.setAuthTag(Buffer.from(tagValue, "base64url"));
+    return Buffer.concat([
+      decipher.update(Buffer.from(encryptedValue, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
+  } catch {
+    throw new ApiError(
+      503,
+      "A saved provider credential could not be decrypted. Check FOLIO_CREDENTIALS_ENCRYPTION_KEY.",
+    );
+  }
+}
+
+type CredentialRow = {
+  groq_api_key: string | null;
+  openai_api_key: string | null;
+};
+
+async function credentialRow(userId: string) {
+  const { data, error } = await adminDatabase()
+    .from("provider_credentials")
+    .select("groq_api_key, openai_api_key")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error)
+    throw new ApiError(
+      503,
+      "Secure provider credentials are not connected yet. Apply the latest Supabase migration first.",
+    );
+  return data as CredentialRow | null;
+}
+
+export async function providerCredentialStatus(userId: string) {
+  const row = await credentialRow(userId);
+  return {
+    groq: Boolean(row?.groq_api_key),
+    openai: Boolean(row?.openai_api_key),
+    serverGroq: Boolean(process.env.GROQ_API_KEY),
+    serverOpenAI: Boolean(process.env.OPENAI_API_KEY),
+  };
+}
+
+export async function getProviderKeys(userId: string): Promise<ProviderKeys> {
+  const row = await credentialRow(userId);
+  return {
+    groqApiKey: row?.groq_api_key
+      ? decryptSecret(row.groq_api_key)
+      : process.env.GROQ_API_KEY || undefined,
+    openaiApiKey: row?.openai_api_key
+      ? decryptSecret(row.openai_api_key)
+      : process.env.OPENAI_API_KEY || undefined,
+  };
+}
+
+export async function saveProviderKeys(
+  userId: string,
+  input: { groqApiKey?: string; openaiApiKey?: string },
+) {
+  const current = await credentialRow(userId);
+  const row = {
+    user_id: userId,
+    groq_api_key:
+      input.groqApiKey === undefined
+        ? current?.groq_api_key || null
+        : encryptSecret(input.groqApiKey),
+    openai_api_key:
+      input.openaiApiKey === undefined
+        ? current?.openai_api_key || null
+        : encryptSecret(input.openaiApiKey),
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await adminDatabase()
+    .from("provider_credentials")
+    .upsert(row, { onConflict: "user_id" });
+  if (error) throw error;
+}
+
+export async function deleteProviderKey(
+  userId: string,
+  provider: "groq" | "openai",
+) {
+  const column = provider === "groq" ? "groq_api_key" : "openai_api_key";
+  const { error } = await adminDatabase()
+    .from("provider_credentials")
+    .update({ [column]: null, updated_at: new Date().toISOString() })
+    .eq("user_id", userId);
+  if (error) throw error;
 }
 export function apiError(error: unknown) {
   if (error instanceof ZodError)
@@ -77,19 +207,22 @@ export async function ownedMeeting(request: Request, id: string) {
   if (!data) throw new ApiError(404, "This meeting could not be found.");
   return { db, user, meeting: data.data as Meeting };
 }
-export function requireProcessing(recording = false) {
-  if (
-    !process.env.GROQ_API_KEY ||
-    (!process.env.INNGEST_EVENT_KEY && process.env.INNGEST_DEV !== "1")
-  )
+export async function requireProcessing(userId: string, recording = false) {
+  if (!process.env.INNGEST_EVENT_KEY && process.env.INNGEST_DEV !== "1")
     throw new ApiError(
       503,
-      "AI processing isn't connected yet. Add Groq and Inngest credentials in your deployment settings.",
+      "Background processing isn't connected yet. Add your Inngest credentials in the deployment settings.",
     );
-  if (recording && !process.env.OPENAI_API_KEY)
+  const keys = await getProviderKeys(userId);
+  if (!keys.groqApiKey)
     throw new ApiError(
       503,
-      "Video transcription isn't connected yet. Add an OpenAI API key, or paste a transcript instead.",
+      "Add a Groq API key in Settings before starting an analysis.",
+    );
+  if (recording && !keys.openaiApiKey)
+    throw new ApiError(
+      503,
+      "Add an OpenAI API key in Settings for recordings and video links, or paste a transcript instead.",
     );
 }
 export async function rateLimit(userId: string, bucket: string, limit: number) {

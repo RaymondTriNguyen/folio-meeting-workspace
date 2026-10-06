@@ -4,17 +4,19 @@ The application works in sample mode without external services. Live processing 
 
 ## Supabase
 
-1. Create a project and run `supabase/migrations/001_workspace.sql` in its SQL editor. This creates meetings, owner-only read policies, private recording storage, and server-only request throttling.
+1. Create a project and run `supabase/migrations/001_workspace.sql` and `supabase/migrations/002_provider_credentials.sql` in its SQL editor. These create meetings, owner-only read policies, private recording storage, server-only request throttling, and encrypted per-user provider-key storage.
 2. Enable Email/Password authentication. Keep email confirmation enabled for public deployments. Set the production Site URL and permitted local/preview redirect URLs.
 3. Retrieve the project URL, public anon key, and secret service-role key. Never expose the service-role key with a `NEXT_PUBLIC_` prefix.
 4. Configure the project storage limit to support 25 MB uploads. If your plan permits less, lower `MAX_UPLOAD_BYTES`, the SQL bucket limit, and the UI wording together.
 
 This release provides personal workspaces. Browser reads are restricted by row-level security. Validated server routes check ownership before any mutation or provider operation.
 
+Folio lets signed-in users add their own Groq and OpenAI keys from Settings. Keys are encrypted before storage with `FOLIO_CREDENTIALS_ENCRYPTION_KEY`; the plaintext values are never returned to the browser or saved in meeting records. Generate a long random value for this variable and keep it stable. Rotating it without re-encrypting the table makes existing user keys unreadable.
+
 ## AI providers
 
-- Set a Groq key and verify access to the configured model. The default `GROQ_MODEL` is `llama-3.3-70b-versatile`; JSON mode is required.
-- Set an OpenAI key for uploaded videos and links that resolve to media. The pipeline uses the transcription endpoint with `gpt-4o-transcribe-diarize`, speaker labels, and timestamped segments.
+- Set a Groq key in each signed-in user’s Folio Settings page, or set `GROQ_API_KEY` as an optional server fallback. JSON mode is required.
+- Set an OpenAI key in each signed-in user’s Folio Settings page, or set `OPENAI_API_KEY` as an optional server fallback for uploaded videos and links that resolve to media. The pipeline uses the transcription endpoint with `gpt-4o-transcribe-diarize`, speaker labels, and timestamped segments.
 
 YouTube links use the captions exposed by YouTube and do not require an additional resolver. Public or unlisted videos with captions can be imported. TikTok, Instagram, Vimeo, X, and other video-page links need a resolver that returns a short-lived direct media URL. The original URL is stored with the meeting, while only the imported transcript is sent to Groq.
 
@@ -46,6 +48,7 @@ Import the repository, choose **Next.js**, set the root directory to this projec
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL | Yes |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public auth client key | Yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | Owner-checked server data access | No |
+| `FOLIO_CREDENTIALS_ENCRYPTION_KEY` | Encrypts per-user provider keys at rest | No |
 | `GROQ_API_KEY` | Extraction, summaries, Q&A | No |
 | `GROQ_MODEL` | Optional text model override | No |
 | `OPENAI_API_KEY` | Uploaded and resolver-backed video transcription | No |

@@ -19,6 +19,8 @@ To test a real video without creating a Supabase account, copy `.env.example` to
 
 Keep `FOLIO_LOCAL_TEST_MODE=0` for any hosted or production deployment. This development route intentionally has no account boundary.
 
+In a connected workspace, signed-in users can add Groq and OpenAI keys from **Settings**. Run both Supabase migrations and set a stable `FOLIO_CREDENTIALS_ENCRYPTION_KEY`; Folio encrypts each user key before storage and never returns the plaintext value to the browser.
+
 ## Connect the full stack
 
 Follow [the deployment guide](docs/DEPLOYMENT.md). Copy `.env.example` to `.env.local`, configure Supabase Auth/PostgreSQL/Storage, Groq, OpenAI, and Inngest, and apply the SQL migration.

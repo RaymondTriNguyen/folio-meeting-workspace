@@ -13,7 +13,7 @@ import { MAX_UPLOAD_BYTES, mediaExtensions } from "@/lib/domain";
 export async function POST(request: Request) {
   try {
     const { db, user } = await authenticated(request);
-    requireProcessing(true);
+    await requireProcessing(user.id, true);
     const input = z
       .object({
         name: z.string().min(1).max(250),

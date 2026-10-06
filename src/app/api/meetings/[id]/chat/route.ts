@@ -6,6 +6,7 @@ import {
   ownedMeeting,
   jsonBody,
   rateLimit,
+  getProviderKeys,
 } from "@/lib/server";
 import { askMeeting } from "@/lib/ai";
 export const maxDuration = 180;
@@ -24,7 +25,9 @@ export async function POST(
       .object({ question: z.string().trim().min(3).max(2000) })
       .parse(await jsonBody(request, 12000));
     await rateLimit(user.id, "chat", 60);
-    return NextResponse.json(await askMeeting(meeting, question));
+    return NextResponse.json(
+      await askMeeting(meeting, question, await getProviderKeys(user.id)),
+    );
   } catch (error) {
     return apiError(error);
   }

@@ -24,6 +24,7 @@ import {
   FolderClosed,
   Headphones,
   LayoutDashboard,
+  KeyRound,
   ListFilter,
   Link2,
   LoaderCircle,
@@ -1310,8 +1311,45 @@ function ProjectsPage({ onUpload }: { onUpload: () => void }) {
 }
 
 function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
-  const { demo, session, config, reset, toast } = useWorkspace();
+  const { demo, session, config, reset, toast, api } = useWorkspace();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [credentials, setCredentials] = useState({
+    groq: false,
+    openai: false,
+    serverGroq: false,
+    serverOpenAI: false,
+  });
+  const [groqKey, setGroqKey] = useState("");
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [credentialBusy, setCredentialBusy] = useState("");
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    void fetch("/api/settings/providers", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(async (response) => {
+        const result = (await response.json()) as typeof credentials & {
+          error?: string;
+        };
+        if (!response.ok) throw new Error(result.error || "Provider settings could not be loaded.");
+        return result;
+      })
+      .then((result) => {
+        if (active) setCredentials(result);
+      })
+      .catch((error) => {
+        if (active)
+          toast(
+            error instanceof Error
+              ? error.message
+              : "Provider settings could not be loaded.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [session, toast]);
   const services = [
     {
       label: "Workspace & secure storage",
@@ -1320,17 +1358,17 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
     },
     {
       label: "Meeting intelligence",
-      connected: config.ai,
+      connected: config.ai || credentials.groq,
       text: "Evidence-backed extraction, summaries, and questions.",
     },
     {
       label: "Recording transcription",
-      connected: config.transcription,
+      connected: config.transcription || credentials.openai,
       text: "Speech-to-text with timing and speaker labels.",
     },
     {
       label: "Multi-platform video links",
-      connected: config.videoLinks || config.transcription,
+      connected: config.videoLinks || config.transcription || credentials.openai,
       text: "YouTube captions or resolver-backed TikTok, Instagram, Vimeo, and X links.",
     },
     {
@@ -1343,6 +1381,55 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
     const { error } = await browserDatabase()!.auth.signOut();
     if (error) toast(error.message);
     else toast("You have been signed out.");
+  }
+  async function saveCredential(provider: "groq" | "openai") {
+    const value = provider === "groq" ? groqKey.trim() : openaiKey.trim();
+    if (!value) {
+      toast(`Enter your ${provider === "groq" ? "Groq" : "OpenAI"} API key first.`);
+      return;
+    }
+    setCredentialBusy(provider);
+    try {
+      const result = await api<typeof credentials>("/api/settings/providers", {
+        method: "POST",
+        body: JSON.stringify(
+          provider === "groq"
+            ? { groqApiKey: value }
+            : { openaiApiKey: value },
+        ),
+      });
+      setCredentials(result);
+      if (provider === "groq") setGroqKey("");
+      else setOpenaiKey("");
+      toast(`${provider === "groq" ? "Groq" : "OpenAI"} key saved securely.`);
+    } catch (error) {
+      toast(
+        error instanceof Error
+          ? error.message
+          : "The provider key could not be saved.",
+      );
+    } finally {
+      setCredentialBusy("");
+    }
+  }
+  async function removeCredential(provider: "groq" | "openai") {
+    setCredentialBusy(`remove-${provider}`);
+    try {
+      const result = await api<typeof credentials>("/api/settings/providers", {
+        method: "DELETE",
+        body: JSON.stringify({ provider }),
+      });
+      setCredentials(result);
+      toast(`${provider === "groq" ? "Groq" : "OpenAI"} key removed.`);
+    } catch (error) {
+      toast(
+        error instanceof Error
+          ? error.message
+          : "The provider key could not be removed.",
+      );
+    } finally {
+      setCredentialBusy("");
+    }
   }
   return (
     <div className="page-enter settings-page">
@@ -1393,6 +1480,62 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
           </button>
         </div>
       </section>
+      <section className="panel settings-section provider-keys-section">
+        <div className="section-heading">
+          <div>
+            <h2>Your provider keys</h2>
+            <p className="section-subtitle">
+              Use your own provider accounts and keep processing costs in your
+              control.
+            </p>
+          </div>
+          <KeyRound size={19} />
+        </div>
+        {demo ? (
+          <div className="provider-keys-locked">
+            <ShieldCheck size={20} />
+            <div>
+              <strong>Sign in to add private API keys</strong>
+              <p>
+                Keys are encrypted per account and are never shown back after
+                you save them.
+              </p>
+            </div>
+            <button className="button secondary" onClick={onSignIn}>
+              Sign in
+            </button>
+          </div>
+        ) : (
+          <div className="provider-key-list">
+            <ProviderKeyRow
+              label="Groq"
+              description="Required for extraction, summaries, and Q&A."
+              placeholder="gsk_..."
+              value={groqKey}
+              configured={credentials.groq}
+              serverFallback={credentials.serverGroq}
+              busy={credentialBusy === "groq"}
+              removeBusy={credentialBusy === "remove-groq"}
+              onChange={setGroqKey}
+              onSave={() => void saveCredential("groq")}
+              onRemove={() => void removeCredential("groq")}
+            />
+            <ProviderKeyRow
+              label="OpenAI"
+              description="Required for uploaded recordings and video links."
+              placeholder="sk-..."
+              value={openaiKey}
+              configured={credentials.openai}
+              serverFallback={credentials.serverOpenAI}
+              busy={credentialBusy === "openai"}
+              removeBusy={credentialBusy === "remove-openai"}
+              onChange={setOpenaiKey}
+              onSave={() => void saveCredential("openai")}
+              onRemove={() => void removeCredential("openai")}
+            />
+          </div>
+        )}
+      </section>
       <section className="panel settings-section">
         <div className="section-heading">
           <h2>Workspace connections</h2>
@@ -1426,9 +1569,9 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
           <div>
             <p>
               The project includes a complete setup guide in{" "}
-              <code>docs/DEPLOYMENT.md</code>. Connect Supabase, Groq, OpenAI,
-              and Inngest through your Vercel environment settings, then
-              redeploy.
+              <code>docs/DEPLOYMENT.md</code>. Connect Supabase and Inngest,
+              run both database migrations, and add a stable encryption secret.
+              Signed-in users can then add their own Groq and OpenAI keys here.
             </p>
             <p>
               Provider keys stay on the server. The status above confirms
@@ -1498,6 +1641,70 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+function ProviderKeyRow({
+  label,
+  description,
+  placeholder,
+  value,
+  configured,
+  serverFallback,
+  busy,
+  removeBusy,
+  onChange,
+  onSave,
+  onRemove,
+}: {
+  label: string;
+  description: string;
+  placeholder: string;
+  value: string;
+  configured: boolean;
+  serverFallback: boolean;
+  busy: boolean;
+  removeBusy: boolean;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="provider-key-row">
+      <div className="provider-key-copy">
+        <div className="provider-key-title">
+          <strong>{label}</strong>
+          <span className={`connection-badge ${configured ? "connected" : ""}`}>
+            {configured ? "Saved" : serverFallback ? "Server default" : "Not added"}
+          </span>
+        </div>
+        <p>{description}</p>
+      </div>
+      <div className="provider-key-controls">
+        <input
+          type="password"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={configured ? "Enter a replacement key" : placeholder}
+          autoComplete="new-password"
+          spellCheck={false}
+          aria-label={`${label} API key`}
+        />
+        <button className="button small" type="button" onClick={onSave} disabled={busy}>
+          {busy ? "Saving..." : configured ? "Replace" : "Save key"}
+        </button>
+        {configured && (
+          <button
+            className="text-button danger-text"
+            type="button"
+            onClick={onRemove}
+            disabled={removeBusy}
+          >
+            {removeBusy ? "Removing..." : "Remove"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

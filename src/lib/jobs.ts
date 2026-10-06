@@ -1,5 +1,5 @@
 import { Inngest, NonRetriableError } from "inngest";
-import { adminDatabase } from "./server";
+import { adminDatabase, getProviderKeys } from "./server";
 import {
   chunkTranscript,
   MAX_MEETING_BYTES,
@@ -86,7 +86,8 @@ export const processMeeting = inngest.createFunction(
     const transcribeMedia = (mediaUrl: string, prefix: string) =>
       step.run(`${prefix}-transcription`, async () => {
         await readMeeting(meetingId, ownerId);
-        const result = await transcribeMediaUrl(mediaUrl);
+        const keys = await getProviderKeys(ownerId);
+        const result = await transcribeMediaUrl(mediaUrl, keys);
         if (!result.segments.length)
           throw new NonRetriableError("No speech was found in this video.");
         if (
@@ -186,12 +187,13 @@ export const processMeeting = inngest.createFunction(
     for (let i = 0; i < chunks.length; i++) {
       const items = await step.run(`extract-chunk-${i}`, async () => {
         await readMeeting(meetingId, ownerId);
+        const keys = await getProviderKeys(ownerId);
         return extractChunk(chunks[i], {
           title: meeting.title,
           project: meeting.project,
           participants: meeting.participants,
           context: meeting.context,
-        });
+        }, keys);
       });
       collected.push(...items);
     }
@@ -210,7 +212,12 @@ export const processMeeting = inngest.createFunction(
     for (let i = 0; i < meeting.items.length; i += 20) {
       const verified = await step.run(`verify-meaning-${i}`, async () => {
         await readMeeting(meetingId, ownerId);
-        return verifyMeaning(meeting.items.slice(i, i + 40), meeting.transcript);
+        const keys = await getProviderKeys(ownerId);
+        return verifyMeaning(
+          meeting.items.slice(i, i + 40),
+          meeting.transcript,
+          keys,
+        );
       });
       supported.push(...verified);
     }
@@ -229,7 +236,8 @@ export const processMeeting = inngest.createFunction(
     );
     const summary = await step.run("compose-summary", async () => {
       await readMeeting(meetingId, ownerId);
-      return composeSummary(meeting);
+      const keys = await getProviderKeys(ownerId);
+      return composeSummary(meeting, keys);
     });
     await step.run("complete", () =>
       saveMeeting(

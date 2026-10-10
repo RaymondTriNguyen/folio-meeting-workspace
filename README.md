@@ -23,9 +23,9 @@ In a connected workspace, signed-in users can add Groq and OpenAI keys from **Se
 
 ## Connect the full stack
 
-Follow [the deployment guide](docs/DEPLOYMENT.md). Copy `.env.example` to `.env.local`, configure Supabase Auth/PostgreSQL/Storage, Groq, OpenAI, and Inngest, and apply the SQL migration.
+Follow [the deployment guide](docs/DEPLOYMENT.md). Copy `.env.example` to `.env.local`, configure Supabase Auth/PostgreSQL/Storage, Groq, and OpenAI, and apply the SQL migration. The prototype processes signed-in analyses directly; Inngest is optional until durable background processing is enabled.
 
-Uploaded videos go directly to private storage. Inngest resolves video links, runs transcription, chunked extraction, evidence verification, and summary composition in durable steps. Private APIs validate sessions and ownership on the server. Provider credentials never reach the browser.
+Uploaded videos go directly to private storage. The prototype resolves links, runs transcription, chunked extraction, evidence verification, and summary composition directly in the request. Private APIs validate sessions and ownership on the server. Provider credentials never reach the browser.
 
 ## Included
 

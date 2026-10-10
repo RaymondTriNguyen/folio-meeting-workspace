@@ -23,6 +23,7 @@ type Config = {
   ai: boolean;
   transcription: boolean;
   jobs: boolean;
+  directProcessing: boolean;
   videoLinks: boolean;
   localTest: boolean;
 };
@@ -69,6 +70,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     ai: false,
     transcription: false,
     jobs: false,
+    directProcessing: false,
     videoLinks: false,
     localTest: false,
   });

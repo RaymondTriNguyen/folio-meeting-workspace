@@ -24,7 +24,13 @@ Set `VIDEO_LINK_RESOLVER_URL` to a server-side adapter you control. Folio sends 
 
 Recordings and resolved media are fetched server-side and shared with OpenAI for transcription. Transcript excerpts and context are sent to Groq. Review provider retention settings for your requirements. App deletion removes the meeting and recording from Supabase, but does not delete provider logs or Inngest run history.
 
-## Inngest
+## Prototype processing
+
+The prototype runs signed-in processing directly in the Next.js request, so it does not require Inngest. This keeps the first version simple for testing with pasted transcripts, YouTube captions, uploaded recordings, and configured video-link resolvers. The processing routes allow up to five minutes for a request on Vercel.
+
+Keep the browser open while a video is being analyzed. For larger videos or higher-volume usage, enable the durable job flow below before treating the app as production-ready.
+
+## Inngest (later production phase)
 
 1. Create an app/environment and retrieve its event and signing keys.
 2. Add both keys to Vercel.

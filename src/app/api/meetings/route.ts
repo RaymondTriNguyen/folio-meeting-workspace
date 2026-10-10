@@ -14,8 +14,10 @@ import {
   parseTranscript,
   type Meeting,
 } from "@/lib/domain";
-import { inngest } from "@/lib/jobs";
 import { detectVideoProvider } from "@/lib/video-source";
+import { processMeetingDirect } from "@/lib/direct-processing";
+
+export const maxDuration = 300;
 
 export async function GET(request: Request) {
   try {
@@ -112,23 +114,8 @@ export async function POST(request: Request) {
         data: meeting,
       });
     if (error) throw error;
-    try {
-      await inngest.send({
-        name: "folio/meeting.created",
-        data: { meetingId: meeting.id, ownerId: user.id, runId: randomUUID() },
-      });
-    } catch {
-      meeting.status = "failed";
-      meeting.error =
-        "Unable to reach background processing. Check your Inngest connection and retry.";
-      meeting.stage = "Could not start";
-      await db
-        .from("meetings")
-        .update({ data: meeting, status: "failed" })
-        .eq("id", meeting.id)
-        .eq("user_id", user.id);
-    }
-    return NextResponse.json({ meeting }, { status: 201 });
+    const processed = await processMeetingDirect(meeting, user.id);
+    return NextResponse.json({ meeting: processed }, { status: 201 });
   } catch (error) {
     return apiError(error);
   }

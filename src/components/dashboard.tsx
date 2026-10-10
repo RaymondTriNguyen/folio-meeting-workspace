@@ -1372,9 +1372,9 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
       text: "YouTube captions or resolver-backed TikTok, Instagram, Vimeo, and X links.",
     },
     {
-      label: "Background processing",
-      connected: config.jobs,
-      text: "Reliable processing that continues after you leave.",
+      label: "Prototype processing",
+      connected: config.directProcessing,
+      text: "Runs directly while you wait; durable background jobs come later.",
     },
   ];
   async function signOut() {
@@ -1569,9 +1569,10 @@ function SettingsPage({ onSignIn }: { onSignIn: () => void }) {
           <div>
             <p>
               The project includes a complete setup guide in{" "}
-              <code>docs/DEPLOYMENT.md</code>. Connect Supabase and Inngest,
-              run both database migrations, and add a stable encryption secret.
-              Signed-in users can then add their own Groq and OpenAI keys here.
+              <code>docs/DEPLOYMENT.md</code>. For this prototype, connect
+              Supabase, run both database migrations, and add a stable
+              encryption secret. Inngest is optional until durable background
+              processing is enabled.
             </p>
             <p>
               Provider keys stay on the server. The status above confirms

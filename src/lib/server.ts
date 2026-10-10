@@ -208,11 +208,6 @@ export async function ownedMeeting(request: Request, id: string) {
   return { db, user, meeting: data.data as Meeting };
 }
 export async function requireProcessing(userId: string, recording = false) {
-  if (!process.env.INNGEST_EVENT_KEY && process.env.INNGEST_DEV !== "1")
-    throw new ApiError(
-      503,
-      "Background processing isn't connected yet. Add your Inngest credentials in the deployment settings.",
-    );
   const keys = await getProviderKeys(userId);
   if (!keys.groqApiKey)
     throw new ApiError(

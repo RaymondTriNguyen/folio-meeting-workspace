@@ -11,6 +11,7 @@ export function GET() {
     jobs: Boolean(
       process.env.INNGEST_EVENT_KEY || process.env.INNGEST_DEV === "1",
     ),
+    directProcessing: true,
     videoLinks: Boolean(process.env.VIDEO_LINK_RESOLVER_URL),
     localTest: process.env.NODE_ENV !== "production" &&
       process.env.FOLIO_LOCAL_TEST_MODE === "1" &&
